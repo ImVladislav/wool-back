@@ -6,15 +6,13 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const bot1Prompt = JSON.parse(
-   fs.readFileSync('./prompts/wool.json', 'utf8')
-);
+const bot1Prompt = JSON.parse(fs.readFileSync('prompts/wool.json', 'utf8'));
 
 const app = express();
 const PORT = 4000;
 const TOKEN = process.env.TOKEN;
 
-const allowedOrigins = ['https://dusty-six.vercel.app/', 'woolagent.xyz'];
+const allowedOrigins = ['https://dusty-six.vercel.app/', 'https://woolagent.xyz'];
 
 app.use(
    cors({
@@ -46,18 +44,22 @@ app.use('/chat', limiter);
 app.post('/chat', async (req, res) => {
    try {
       const { messages } = req.body;
-      //   console.log('message', messages);
+      console.log('message', messages);
 
-      const { description, personality, instruction, example_messages } =
-         bot1Prompt;
+      const {
+         description: { agent, background, culture },
+         personality: { traits, tone, reaction },
+         instructions, // Этот объект уже является массивом, не имеет вложенных объектов
+         example_messages
+      } = bot1Prompt;
 
       // Очищаем HTML-теги из всех сообщений
-      const cleanedMessages = messages.map((msg) =>
-         msg.message
-            .replace(/<.*?>/g, '')
-            .replace(/^You:\s*/, '')
-            .trim()
-      );
+      const cleanedMessages = messages.map((msg) => {
+         const cleanedMsg = msg.replace(/<.*?>/g, '').trim(); // Removes HTML tags
+         return cleanedMsg.replace(/^You:\s*/, '').trim(); // Removes "You:" if present
+      });
+
+      console.log('bot1Prompt', bot1Prompt);
 
       // Конвертируем сообщения в формат OpenAI API
       const chatHistory = [];
@@ -75,29 +77,41 @@ app.post('/chat', async (req, res) => {
       // Ограничиваем историю (например, до 10 последних сообщений)
       const trimmedHistory = chatHistory.slice(-10);
 
+
+
       const promptMessages = [
          {
-            role: 'system',
-            content: `
-        Character Overview:
-        - Description: ${description}
-        - Personality Traits: ${personality.join(', ')}
-        
-        Instructions:
-        - Response Style: ${instruction.response_style}
-        - Emojis: ${instruction.emojis.join(', ')}
-        - Language: ${instruction.language}
-        - Tone: ${instruction.tone}
-        - Slang: ${instruction.slang.join(', ')}
-        - Positive Responses: ${instruction.positive_responses.join(', ')}
-        - Negative Responses: ${instruction.negative_responses.join(', ')}
-     
-        Example Messages:
-        ${example_messages.map((msg) => `- ${msg}`).join('\n')}
-        `
+           role: 'system',
+           content: `
+             Character Overview:
+             - Agent: ${agent || 'No agent description available'}
+             - Background: ${background || 'No background description available'}
+             - Culture: ${culture || 'No culture description available'}
+       
+             Personality Traits:
+             - ${traits && traits.length > 0 ? traits.join(', ') : 'No personality traits available'}
+       
+             Tone:
+             - ${tone && tone.length > 0 ? tone.join(', ') : 'No tone available'}
+       
+             Reaction to Unexpected Scenarios:
+             - ${reaction && reaction.unexpected_scenarios ? reaction.unexpected_scenarios : 'No reaction info available'}
+       
+             Instructions:
+             ${instructions && instructions.length > 0 
+               ? instructions.map((instruction) => `- ${instruction}`).join('\n')
+               : 'No instructions available'}
+       
+             Example Messages:
+             ${example_messages && example_messages.length > 0 
+               ? example_messages.map((msg) => `- ${msg}`).join('\n') 
+               : 'No example messages available'}
+           `
          },
          ...trimmedHistory // Добавляем очищенную историю
-      ];
+       ];
+
+      console.log('promptMessages', promptMessages);
 
       try {
          const response = await axios.post(
@@ -121,7 +135,7 @@ app.post('/chat', async (req, res) => {
          res.status(500).json({ error: 'Ошибка при отправке запроса' });
       }
    } catch (error) {
-      console.log('Error');
+      console.log('Error', error);
    }
 });
 
