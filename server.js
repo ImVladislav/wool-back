@@ -12,7 +12,7 @@ const app = express();
 const PORT = 4000;
 const TOKEN = process.env.TOKEN;
 
-const allowedOrigins = ['https://dusty-six.vercel.app/', 'https://woolagent.xyz'];
+const allowedOrigins = ['https://dusty-six.vercel.app', 'https://woolagent.xyz'];
 
 app.use(
    cors({
