@@ -6,7 +6,7 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const bot1Prompt = JSON.parse(fs.readFileSync('prompts/wool.json', 'utf8'));
+const bot1Prompt = JSON.parse(fs.readFileSync('prompts/AICY.json', 'utf8'));
 
 const app = express();
 const PORT = 4000;
@@ -78,7 +78,6 @@ app.post('/chat', async (req, res) => {
       const trimmedHistory = chatHistory.slice(-10);
 
 
-
       const promptMessages = [
          {
            role: 'system',
@@ -87,29 +86,29 @@ app.post('/chat', async (req, res) => {
              - Agent: ${agent || 'No agent description available'}
              - Background: ${background || 'No background description available'}
              - Culture: ${culture || 'No culture description available'}
-       
+         
              Personality Traits:
              - ${traits && traits.length > 0 ? traits.join(', ') : 'No personality traits available'}
-       
+         
              Tone:
              - ${tone && tone.length > 0 ? tone.join(', ') : 'No tone available'}
-       
+         
              Reaction to Unexpected Scenarios:
              - ${reaction && reaction.unexpected_scenarios ? reaction.unexpected_scenarios : 'No reaction info available'}
-       
+         
              Instructions:
              ${instructions && instructions.length > 0 
                ? instructions.map((instruction) => `- ${instruction}`).join('\n')
                : 'No instructions available'}
-       
+         
              Example Messages:
              ${example_messages && example_messages.length > 0 
                ? example_messages.map((msg) => `- ${msg}`).join('\n') 
                : 'No example messages available'}
            `
          },
-         ...trimmedHistory // Добавляем очищенную историю
-       ];
+         ...trimmedHistory // Додаємо очищену історію
+      ];
 
       console.log('promptMessages', promptMessages);
 
