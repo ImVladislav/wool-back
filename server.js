@@ -77,7 +77,6 @@ app.post('/chat', async (req, res) => {
       // Ограничиваем историю (например, до 10 последних сообщений)
       const trimmedHistory = chatHistory.slice(-10);
 
-
       const promptMessages = [
          {
            role: 'system',
@@ -86,29 +85,30 @@ app.post('/chat', async (req, res) => {
              - Agent: ${agent || 'No agent description available'}
              - Background: ${background || 'No background description available'}
              - Culture: ${culture || 'No culture description available'}
-         
+           
              Personality Traits:
              - ${traits && traits.length > 0 ? traits.join(', ') : 'No personality traits available'}
-         
+           
              Tone:
              - ${tone && tone.length > 0 ? tone.join(', ') : 'No tone available'}
-         
+           
              Reaction to Unexpected Scenarios:
              - ${reaction && reaction.unexpected_scenarios ? reaction.unexpected_scenarios : 'No reaction info available'}
-         
+           
              Instructions:
              ${instructions && instructions.length > 0 
                ? instructions.map((instruction) => `- ${instruction}`).join('\n')
                : 'No instructions available'}
-         
+           
              Example Messages:
              ${example_messages && example_messages.length > 0 
                ? example_messages.map((msg) => `- ${msg}`).join('\n') 
                : 'No example messages available'}
            `
          },
-         ...trimmedHistory // Додаємо очищену історію
-      ];
+         ...trimmedHistory // Adding the cleaned history
+       ];
+       
 
       console.log('promptMessages', promptMessages);
 
