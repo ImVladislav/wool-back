@@ -6,7 +6,7 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const bot1Prompt = JSON.parse(fs.readFileSync('prompts/AICY.json', 'utf8'));
+const bot1Prompt = JSON.parse(fs.readFileSync('prompts/snap.json', 'utf8'));
 
 const app = express();
 const PORT = 4000;
