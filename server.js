@@ -1,18 +1,21 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const axios = require('axios');
-const cors = require('cors');
-const fs = require('fs');
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
-
-const bot1Prompt = JSON.parse(fs.readFileSync('prompts/snap.json', 'utf8'));
+import express from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import TelegramBot from 'node-telegram-bot-api';
+import { openaiRequest } from './services/openaiRequest.js';
+import config from './config/config.json' assert { type: 'json' };
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
-const PORT = 4000;
-const TOKEN = process.env.TOKEN;
+const PORT = 4001;
 
-const allowedOrigins = ['https://jogu-gamma.vercel.app/', 'https://span-delta.vercel.app', 'https://gdino.space', 'https://icy-gamma.vercel.app'];
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// console.log('TELEGRAM_BOT_TOKEN', process.env.TELEGRAM_BOT_TOKEN);
+const tgBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+
+const allowedOrigins = config.enableForDomains;
 
 app.use(
    cors({
@@ -32,7 +35,7 @@ app.use(
 );
 app.use(bodyParser.json());
 
-// Настройка ограничения частоты запросов
+// Setting Request Rate Limiting
 const limiter = rateLimit({
    windowMs: 1 * 60 * 1000,
    max: 60,
@@ -44,100 +47,118 @@ app.use('/chat', limiter);
 app.post('/chat', async (req, res) => {
    try {
       const { messages } = req.body;
-      console.log('message', messages);
+      console.log('messages', messages);
 
-      const {
-         description: { agent, background, culture },
-         personality: { traits, tone, reaction },
-         instructions, // Этот объект уже является массивом, не имеет вложенных объектов
-         example_messages
-      } = bot1Prompt;
+      // Clear HTML tags from all messages and handle message objects
+      const cleanedMessages = messages
+         .map((msg) => {
+            if (typeof msg === 'string') {
+               return msg
+                  .replace(/<.*?>/g, '')
+                  .replace(/^You:\s*/, '')
+                  .trim();
+            }
+            if (msg.message) {
+               return msg.message
+                  .replace(/<.*?>/g, '')
+                  .replace(/^You:\s*/, '')
+                  .trim();
+            }
+            return '';
+         })
+         .filter((msg) => msg); // Remove empty messages
 
-      // Очищаем HTML-теги из всех сообщений
-      const cleanedMessages = messages.map((msg) => {
-         const cleanedMsg = msg.replace(/<.*?>/g, '').trim(); // Removes HTML tags
-         return cleanedMsg.replace(/^You:\s*/, '').trim(); // Removes "You:" if present
-      });
-
-      console.log('bot1Prompt', bot1Prompt);
-
-      // Конвертируем сообщения в формат OpenAI API
+      // Converting messages to OpenAI API format
       const chatHistory = [];
       for (let i = 0; i < cleanedMessages.length; i++) {
          if (i % 2 === 0) {
             chatHistory.push({ role: 'user', content: cleanedMessages[i] });
          } else {
-            chatHistory.push({
-               role: 'assistant',
-               content: cleanedMessages[i]
-            });
+            // Skip "is typing" messages
+            if (!cleanedMessages[i].includes('is typing')) {
+               chatHistory.push({
+                  role: 'assistant',
+                  content: cleanedMessages[i]
+               });
+            }
          }
       }
 
-      // Ограничиваем историю (например, до 10 последних сообщений)
+      // Limit the history (for example, to the last 10 messages)
       const trimmedHistory = chatHistory.slice(-10);
 
-      const promptMessages = [
-         {
-           role: 'system',
-           content: `
-             Character Overview:
-             - Agent: ${agent || 'No agent description available'}
-             - Background: ${background || 'No background description available'}
-             - Culture: ${culture || 'No culture description available'}
-           
-             Personality Traits:
-             - ${traits && traits.length > 0 ? traits.join(', ') : 'No personality traits available'}
-           
-             Tone:
-             - ${tone && tone.length > 0 ? tone.join(', ') : 'No tone available'}
-           
-             Reaction to Unexpected Scenarios:
-             - ${reaction && reaction.unexpected_scenarios ? reaction.unexpected_scenarios : 'No reaction info available'}
-           
-             Instructions:
-             ${instructions && instructions.length > 0 
-               ? instructions.map((instruction) => `- ${instruction}`).join('\n')
-               : 'No instructions available'}
-           
-             Example Messages:
-             ${example_messages && example_messages.length > 0 
-               ? example_messages.map((msg) => `- ${msg}`).join('\n') 
-               : 'No example messages available'}
-           `
-         },
-         ...trimmedHistory // Adding the cleaned history
-       ];
-       
+      const botReply = await openaiRequest(trimmedHistory);
 
-      console.log('promptMessages', promptMessages);
-
-      try {
-         const response = await axios.post(
-            'https://api.openai.com/v1/chat/completions',
-            {
-               model: 'gpt-3.5-turbo',
-               messages: promptMessages
-            },
-            {
-               headers: {
-                  Authorization: `Bearer ${TOKEN}`,
-                  'Content-Type': 'application/json'
-               }
-            }
-         );
-
-         const botReply = response.data.choices[0].message.content.trim();
-         res.json({ reply: botReply });
-      } catch (error) {
-         console.error('Error fetching from OpenAI:', error);
-         res.status(500).json({ error: 'Ошибка при отправке запроса' });
-      }
+      res.json({ reply: botReply });
    } catch (error) {
-      console.log('Error', error);
+      console.error('Error: ', error);
+      res.status(500).json({
+         error: 'Error sending request: ' + error.message
+      });
+   }
+});
+
+const botUsername = process.env.TG_BOT_USERNAME;
+const botNicknameForReply = config.botNicknameForReply;
+const MAX_HISTORY = config.tgMaxHistoryMessagesCount;
+const userConversations = new Map();
+
+tgBot.on('message', async (msg) => {
+   try {
+      const chatId = msg.chat.id;
+      const text = msg.text;
+      const userId = msg.from.id;
+      const userKey = `${chatId}:${userId}`;
+
+      if (!text) return;
+      console.log(text.toLocaleLowerCase(), botNicknameForReply.toLowerCase());
+      const isGroupChat =
+         msg.chat.type === 'group' || msg.chat.type === 'supergroup';
+      const isMentioned = text
+         .toLowerCase()
+         .startsWith(`/${botNicknameForReply.toLowerCase()}`);
+      console.log('msg.reply_to_message.from.first_name', msg.reply_to_message);
+      const isReplyToBot =
+         msg.reply_to_message &&
+         msg.reply_to_message.from &&
+         msg.reply_to_message.from.first_name &&
+         msg.reply_to_message.from.first_name.toLowerCase() ===
+            botUsername.toLowerCase();
+
+      if (isGroupChat && !(isMentioned || isReplyToBot)) {
+         return;
+      }
+
+      if (!userConversations.has(userKey)) {
+         userConversations.set(userKey, []);
+      }
+
+      const messages = userConversations.get(userKey);
+
+      messages.push({ role: 'user', content: text });
+
+      if (messages.length > MAX_HISTORY) {
+         messages.shift();
+      }
+
+      const botReply = await openaiRequest(messages);
+
+      messages.push({ role: 'system', content: botReply });
+
+      if (messages.length > MAX_HISTORY) {
+         messages.shift();
+      }
+
+      const options = isGroupChat
+         ? { reply_to_message_id: msg.message_id }
+         : {};
+
+      tgBot.sendMessage(chatId, botReply, options);
+   } catch (error) {
+      console.error('Error tg bot: ', error.message);
    }
 });
 
 app.listen(PORT, () => {
-   console.log(`Server is running on http://localhost:${PORT}`);
+   console.log(`Server is running on port: ${PORT}`);
 });

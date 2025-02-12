@@ -1,0 +1,6 @@
+{
+   "botNicknameForReply": "dinog",
+   "tgMaxHistoryMessagesCount": 10,
+   "promptName": "gdino.json",
+   "enableForDomains": ["https://dinog.space"]
+}
