@@ -1,5 +1,5 @@
 {
-   "botNicknameForReply": "greek",
+   "botNicknameForReply": "grek",
    "tgMaxHistoryMessagesCount": 10,
    "promptName": "greek.json",
    "enableForDomains": ["https://grekai.world", "https://grek.vercel.app/","https://grek.vercel.app"]
