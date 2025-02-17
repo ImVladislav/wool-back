@@ -2,5 +2,5 @@
    "botNicknameForReply": "greek",
    "tgMaxHistoryMessagesCount": 10,
    "promptName": "greek.json",
-   "enableForDomains": ["https://grekai.world", "https://grek.vercel.app/"]
+   "enableForDomains": ["https://grekai.world", "https://grek.vercel.app"]
 }
