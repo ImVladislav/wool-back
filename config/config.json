@@ -1,6 +1,6 @@
 {
-   "botNicknameForReply": "gdino",
+   "botNicknameForReply": "greek",
    "tgMaxHistoryMessagesCount": 10,
-   "promptName": "gdino.json",
-   "enableForDomains": ["https://dinog.space"]
+   "promptName": "greek.json",
+   "enableForDomains": ["https://grekai.world", "https://grek.vercel.app/"]
 }
